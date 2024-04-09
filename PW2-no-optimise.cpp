@@ -1,6 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include <chrono>  // for high_resolution_clock
+#include <chrono>  
 #include <cmath>
 #include <vector>
 #include <omp.h>
@@ -69,7 +69,6 @@ Mat adaptiveGaussianFilter(const Mat& src, int neighborhoodSize, double factorRa
         }
     }
 
-    // Crop the extended borders to get the final image
     Mat dst;
     extendedDst(Rect(halfSize, halfSize, src.cols, src.rows)).copyTo(dst);
     return dst;
@@ -93,15 +92,14 @@ int main(int argc, char** argv) {
     int cutWidth = 12; // Width to cut from the side
 
     auto begin = std::chrono::high_resolution_clock::now();
-    const int iter = 1; // Adjusted for single adaptive filter application
+    const int iter = 1; 
 
-    cv::Mat destination = adaptiveGaussianFilter(source, 5, 0.01); // Example usage with adaptiveGaussianFilter
+    cv::Mat destination = adaptiveGaussianFilter(source, 5, 0.01); 
     int width = destination.cols;
     int height = destination.rows;
     cv::Rect leftRect(0, 0, width - cutWidth, height); // Cut right side
     cv::Rect rightRect(cutWidth, 0, width - cutWidth, height); // Cut left side
 
-    // Prepare the left and right eye images
     cv::Mat leftEye = destination(leftRect).clone();
     cv::Mat rightEye = destination(rightRect).clone();
     std::vector<cv::Mat> leftChannels(3);
@@ -110,10 +108,9 @@ int main(int argc, char** argv) {
     leftChannels[0] = cv::Mat::zeros(leftEye.size(), CV_8UC1); // Blue
     cv::merge(leftChannels, leftEye);
 
-    // Keep only cyan channels (green and blue) for the right eye image
     std::vector<cv::Mat> rightChannels(3);
     cv::split(rightEye, rightChannels);
-    rightChannels[2] = cv::Mat::zeros(rightEye.size(), CV_8UC1); // Red (zero out)
+    rightChannels[2] = cv::Mat::zeros(rightEye.size(), CV_8UC1);
     cv::merge(rightChannels, rightEye);
     cv::Mat anaglyph = leftEye + rightEye;
 
@@ -123,9 +120,9 @@ int main(int argc, char** argv) {
     cv::imshow("Processed Image", anaglyph);
 
     std::cout << "Total time: " << diff.count() << " s\n";
-    std::cout << "Time for 1 iteration: " << diff.count()/iter << " s\n"; // Reporting for a single iteration
+    std::cout << "Time for 1 iteration: " << diff.count()/iter << " s\n"; 
     std::cout << "IPS: " << iter/diff.count() << std::endl;
 
-    cv::waitKey(0); // Wait for a key press before exiting
+    cv::waitKey(0); 
     return 0;
 }
