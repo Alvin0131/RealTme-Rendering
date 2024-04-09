@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>REAL PROCESS PW1</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+    }
+    #videoCanvas {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+    <canvas id="videoCanvas"></canvas>
+
+
+
+    <script type="x-shader/x-vertex" id="vertexShader">
+      varying vec2 vUv;
+      void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+      </script>
+      
+   
+      <script type="x-shader/x-fragment" id="fragmentShader">
+      uniform sampler2D videoTex;
+      uniform vec2 resolution;
+      uniform float kernelSize;
+      uniform float sigma;
+      uniform mat3 matrix1; // Matrix for left color transformation
+      uniform mat3 matrix2; // Matrix for right color transformation
+
+      varying vec2 vUv;
+      
+      const float pi = 3.1415926535897932384626433832795;
+      const mat3 laplacianKernel = mat3(
+        0.0,  1.0, 0.0,
+        1.0, -4.0, 1.0,
+        0.0,  1.0, 0.0
+      );
+
+
+
+      
+      float gaussian(float x, float sigma) {
+          return exp(-(x * x) / (2.0 * sigma * sigma)) / (2.0 * pi * sigma * sigma);
+      }
+      
+      vec4 gaussianFilter(vec2 uv, float kernelSize, float sigma) {
+        
+          vec4 sum = vec4(0.0);
+          float halfKernel = floor(kernelSize * 0.5);
+          float kernelSum = 0.0;
+          for (float x = -halfKernel; x <= halfKernel; x++) {
+              for (float y = -halfKernel; y <= halfKernel; y++) {
+                vec2 offset = vec2(x, y) / resolution;
+                // Mirror the UVs at the edges to avoid sampling outside the texture
+                vec2 mirroredUV = uv + offset;
+                mirroredUV.x = mirroredUV.x > 1.0 ? 2.0 - mirroredUV.x : mirroredUV.x;
+                mirroredUV.x = mirroredUV.x < 0.0 ? -mirroredUV.x : mirroredUV.x;
+                mirroredUV.y = mirroredUV.y > 1.0 ? 2.0 - mirroredUV.y : mirroredUV.y;
+                mirroredUV.y = mirroredUV.y < 0.0 ? -mirroredUV.y : mirroredUV.y;
+                float weight = gaussian(length(offset), sigma);
+                sum += texture2D(videoTex, mirroredUV) * weight;
+                kernelSum += weight;
+              }
+          }
+          return sum / kernelSum;
+      }
+      
+
+      /* vec4 laplacianFilter(vec2 uv) {
+        vec4 sum = vec4(0.0);
+        for (int x = -1; x <= 1; x++) {
+          for (int y = -1; y <= 1; y++) {
+            vec2 offset = vec2(float(x), float(y)) / resolution;
+            sum += texture2D(videoTex, uv + offset) * laplacianKernel[x + 1][y + 1];
+          }
+        }
+        return sum;
+      }
+
+      vec4 medianFilter(vec2 uv, float kernelSize) {
+        float halfKernel = floor(kernelSize * 0.5);
+        float area = kernelSize * kernelSize;
+        float offset = 1.0 / resolution.x;
+        float offsetY = 1.0 / resolution.y;
+        vec4 colors[100]; 
+    
+        int count = 0;
+        for (float y = -halfKernel; y <= halfKernel; y++) {
+            for (float x = -halfKernel; x <= halfKernel; x++) {
+                vec2 uvOffset = vec2(x * offset, y * offsetY);
+                colors[count++] = texture2D(videoTex, uv + uvOffset);
+            }
+        }
+    
+        // Insertion sort
+        for (int i = 1; i < int(area); i++) {
+            vec4 temp = colors[i];
+            int j = i - 1;
+    
+            while (j >= 0 && (colors[j].r + colors[j].g + colors[j].b) > (temp.r + temp.g + temp.b)) {
+                colors[j + 1] = colors[j];
+                j--;
+            }
+            colors[j + 1] = temp;
+        }
+    
+        // Return the median pixel
+        return colors[int(area) / 2];
+    }*/
+      void main() {
+
+        vec2 uv = vUv;
+        float featherWidth = 0.05;
+       
+        vec2 leftUV = vec2(vUv.x / 2.0 , vUv.y); 
+      vec2 rightUV = vec2(vUv.x / 2.0 + 0.5, vUv.y); 
+      
+      vec4 leftColor = gaussianFilter(leftUV, kernelSize, sigma);
+      vec4 rightColor = gaussianFilter(rightUV, kernelSize, sigma);
+      /* vec4 leftLaplacian = laplacianFilter(leftUV);
+  vec4 rightLaplacian = laplacianFilter(rightUV);
+  vec4 leftMedian = medianFilter(leftUV, kernelSize);
+  vec4 rightMedian = medianFilter(rightUV, kernelSize);
+  vec3 leftResult = matrix1 * (leftColor.rgb + leftLaplacian.rgb) + leftMedian.rgb;
+  vec3 rightResult = matrix2 * (rightColor.rgb + rightLaplacian.rgb) + rightMedian.rgb;
+*/
+vec3 leftResult = matrix1 * leftColor.rgb ;
+  vec3 rightResult = matrix2 * rightColor.rgb ;
+
+  
+
+      gl_FragColor = vec4(leftResult + rightResult, 1.0);
+    
+    }
+      </script>
+
+
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/examples/jsm/controls/OrbitControls": "https://unpkg.com/three@latest/examples/jsm/controls/OrbitControls.js",
+        "dat.gui": "https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js"
+      }
+    }
+  </script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import dat from 'dat.gui';
+
+let camera, scene, renderer, videoTexture, customUniforms;
+
+
+
+let anaglyphType = 'Optimized'; 
+
+init();
+animate();
+
+function init() {
+    const video = document.createElement('video');
+    video.src = 'video3d.mp4'; 
+    video.muted = true;
+    video.load();
+    video.play();
+    videoTexture = new THREE.VideoTexture(video);
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.z = 400;
+    
+    scene = new THREE.Scene();
+
+    const geometry = new THREE.PlaneGeometry(640, 480); 
+    customUniforms = {
+        videoTex: { type: "t", value: videoTexture },
+        resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        kernelSize: { type: "f", value: 10.0 },
+        sigma: { type: "f", value: 10.0 },
+        matrix1: { type: "m3", value: new THREE.Matrix3() }, 
+        matrix2: { type: "m3", value: new THREE.Matrix3() },
+    };
+
+
+  const matrixes = {
+    "Color":{
+      matrix1: [1, 0, 0, 0, 0, 0, 0, 0, 0],
+      matrix2: [0, 0, 0, 0, 1, 0, 0, 0, 1]
+    },
+    "True Anaglyph":{
+      matrix1: [0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 0],
+      matrix2: [0, 0, 0, 0, 0, 0, 0.299, 0.587, 0.114]
+    },
+    "Gray Anaglyph":{
+      matrix1: [0.299, 0.587, 0.114, 0, 0, 0, 0, 0, 0],
+      matrix2: [0,0,0,0.299, 0.587, 0.114,  0.299, 0.587, 0.114]
+    },
+    "Half Color Anaglyph":{
+      matrix1: [1, 0, 0, 0, 0, 0, 0, 0, 0],
+      matrix2: [0, 0, 0, 0, 1, 0, 0, 0, 0]
+    },
+    "Optimized":{
+      matrix1: [0, 0.7, 0.3, 0, 0, 0, 0, 0, 0],
+      matrix2: [0, 0, 0, 0, 1, 0, 0, 0, 1]
+    }
+  }
+
+const contmana = {
+    AnaglyphType: 'Color'
+};
+
+const gui = new dat.GUI();
+
+
+gui.add(contmana, 'AnaglyphType', Object.keys(matrixes)).onChange(function(value) {
+    customUniforms.matrix1.value.fromArray(matrixes[value].matrix1);
+    customUniforms.matrix2.value.fromArray(matrixes[value].matrix2);
+    
+    customUniforms.matrix1.value.needsUpdate = true;
+    customUniforms.matrix2.value.needsUpdate = true;
+});
+function applySelectedAnaglyph() {
+    const selectedMatrixes = matrixes[contmana.AnaglyphType];
+    customUniforms.matrix1.value.fromArray(selectedMatrixes.matrix1);
+    customUniforms.matrix2.value.fromArray(selectedMatrixes.matrix2);
+    
+
+    customUniforms.matrix1.value.needsUpdate = true;
+    customUniforms.matrix2.value.needsUpdate = true;
+}
+
+applySelectedAnaglyph();
+
+
+    const material = new THREE.ShaderMaterial({
+        uniforms: customUniforms,
+        vertexShader: document.getElementById('vertexShader').textContent,
+        fragmentShader: document.getElementById('fragmentShader').textContent,
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = false;
+
+    window.addEventListener('resize', onWindowResize, false);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    customUniforms.resolution.value.x = window.innerWidth;
+    customUniforms.resolution.value.y = window.innerHeight;
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+
+
+</script>
+
+</body>
+</html>
